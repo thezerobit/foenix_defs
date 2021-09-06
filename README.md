@@ -6,4 +6,9 @@ repo if it is cloned in the same parent folder as this repo.
 For now, the conversion just defines the raw hex and decimal values.
 You will have to cast memory addresses to the appropriate C types in your own code.
 
-These files are distributed under the same license as the source ASM files.
+Building on the generated header files, foenix.h file contains a growing number of
+definitions and macros for interacting directly with the Foenix hardware.
+
+These files in the "defs" folder are distributed under the same license as
+the source assembly files. The convertdefs.py, foenix.h and other files are
+available under the Apache 2.0 license as specified in the LICENSE file.

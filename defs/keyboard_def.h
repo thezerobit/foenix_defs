@@ -15,14 +15,6 @@
 #define PORT_A       0xAF1060
 #define PORT_B       0xAF1061
 
-#define STATUS_PORT  0xAF1807
-#define KBD_STATUS   0xAF1807
-#define KBD_CMD_BUF  0xAF1807
-#define KBD_OUT_BUF  0xAF1803
-#define KBD_INPT_BUF 0xAF1803
-#define KBD_DATA_BUF 0xAF1803
-#define PORT_A       0xAF180A /* This is a Timing Register, the value is hard coded, so there is no need to use those */
-#define PORT_B       0xAF180B /* This is a Timing Register, the value is hard coded, so there is no need to use those */
 
 
 /* Status */
