@@ -98,28 +98,18 @@ typedef struct Sprite {
 #define SPRITE_PALETTE_MASK 0x0E
 #define SPRITE_DEPTH_MASK   0x70
 
+
 /* num is from 0 to 31 or 63 */
-#define spriteEnable(num) \
-	SPRITE_CONTROL[num].control = SPRITE_CONTROL[num].control | SPRITE_Enable
-#define spriteDisable(num) \
-	SPRITE_CONTROL[num].control = SPRITE_CONTROL[num].control & ~SPRITE_Enable
-#define spriteSetEnabled(num, enabled) \
-	SPRITE_CONTROL[num].control = (enabled) ? (SPRITE_CONTROL[num].control | SPRITE_Enable) : (SPRITE_CONTROL[num].control & ~SPRITE_Enable)
-
+/* enable is a bool */
 /* palette from 0 to 7 */
-#define spriteSetPalette(num, palette) \
-	SPRITE_CONTROL[num].control = (SPRITE_CONTROL[num].control & ~SPRITE_PALETTE_MASK) | ((palette) << 1)
-
 /* depth from 0 to 7 */
-#define spriteSetDepth(num, depth) \
-	SPRITE_CONTROL[num].control = (SPRITE_CONTROL[num].control & ~SPRITE_DEPTH_MASK) | ((depth) << 4)
-
-#define spriteCollisionEnable(num) \
-	SPRITE_CONTROL[num].control = SPRITE_CONTROL[num].control | SPRITE_Collision_On
-#define spriteCollisionDisable(num) \
-	SPRITE_CONTROL[num].control = SPRITE_CONTROL[num].control & ~SPRITE_Collision_On
-#define spriteCollisionSetEnabled(num, enabled) \
-	SPRITE_CONTROL[num].control = (enabled) ? (SPRITE_CONTROL[num].control | SPRITE_Collision_On) : (SPRITE_CONTROL[num].control & ~SPRITE_Collision_On)
+/* collision is a bool */
+#define spriteControl(num, enable, palette, depth, collision) \
+	SPRITE_CONTROL[num].control = \
+	((enable) ? SPRITE_Enable : 0) | \
+	((palette) << 1) | \
+	((depth) << 4) | \
+	((collision) ? SPRITE_Collision_On : 0)
 
 /* spriteVideoLoc is the location of the beginning of sprite image data
    in the range 0x000000 to 0x3FFFFF */
@@ -195,6 +185,8 @@ typedef struct TilesetConfig {
 
 #define irqEnableStartOfFrame()  unsetBits8(INT_MASK_REG0, FNX0_INT00_SOF)
 #define irqDisableStartOfFrame() setBits8(INT_MASK_REG0, FNX0_INT00_SOF)
+#define irqEnableKeyboard()  unsetBits8(INT_MASK_REG1, FNX1_INT00_KBD)
+#define irqDisableKeyboard() setBits8(INT_MASK_REG1, FNX1_INT00_KBD)
 
 /* random number generator */
 
