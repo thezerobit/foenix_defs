@@ -147,8 +147,11 @@ typedef struct TILE_DEF_STRUCT {
     u8_t tileSet; /* 0 - 8 */
 } TILE_DEF;
 
-#define tileMapEnable(num) \
-	TILE_MAP_CTRLS[num].control = TILE_MAP_CTRLS[num].control | TILE_Enable
+/* num is 0 to 3 */
+/* enable is bool */
+/* collision is bool */
+#define tileMapControl(num, enable, collision) \
+	TILE_MAP_CTRLS[num].control = ((enable) ? TILE_Enable : 0) | ((collision) ? TILE_Collision_On : 0)
 #define tileMapSetMem(num, addr) copy24BitAddr(addr, TILE_MAP_CTRLS[num].startAddress)
 /* tile map size can be up to 1024 for width and height */
 #define tileMapSetSize(num, width, height) \
