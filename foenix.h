@@ -8,6 +8,7 @@
 #include "defs/keyboard_def.h"
 #include "defs/RTC_def.h"
 #include "defs/GABE_Control_Registers_def.h"
+#include "defs/Trinity_CFP9301_def.h"
 
 /* helpers */
 
@@ -35,6 +36,22 @@
 
 #define mouseEnable() setBits8(MOUSE_PTR_CTRL_REG_L, 1)
 #define mouseDisable() unsetBits8(MOUSE_PTR_CTRL_REG_L, 1)
+
+/* joystick */
+
+#define JOY_UP      0x01
+#define JOY_DOWN    0x02
+#define JOY_LEFT    0x04
+#define JOY_RIGHT   0x08
+#define JOY_BUTTON1 0x10
+#define JOY_BUTTON2 0x40
+#define JOY_BUTTON3 0x40
+
+#define JOY_0_1_MASK (JOY_UP | JOY_DOWN | JOY_LEFT | JOY_RIGHT | JOY_BUTTON1 | JOY_BUTTON2 | JOY_BUTTON3)
+#define JOY_2_3_MASK (JOY_UP | JOY_DOWN | JOY_LEFT | JOY_RIGHT | JOY_BUTTON1)
+
+/* num is 0 to 3 */
+#define joyGetState(num) (~u8Ptr(JOYSTICK0)[num] & ((num < 2) ? JOY_0_1_MASK : JOY_2_3_MASK))
 
 /* video */
 
