@@ -1,0 +1,20 @@
+{
+    "configurations": [
+        {
+            "name": "C256FoenixWDC",
+            "includePath": [
+                "C:\\wdc\\Tools\\include",
+                "${workspaceFolder}/**"
+            ],
+            "defines": ["far"],
+            "cStandard": "c89",
+            "cppStandard": "c++98",
+            "intelliSenseMode": "${default}",
+            "compilerPath": "C:\\wdc\\Tools\\bin\\WDC816CC.exe",
+            "compilerArgs": [
+                "-ML"
+            ]
+        }
+    ],
+    "version": 4
+}

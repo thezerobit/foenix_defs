@@ -9,6 +9,10 @@ You will have to cast memory addresses to the appropriate C types in your own co
 Building on the generated header files, foenix.h file contains a growing number of
 definitions and macros for interacting directly with the Foenix hardware.
 
+The engine.h / engine.c files represent a proof-of-concept level implementation
+of a game engine that takes care of interrupt handling and makes building games
+a tiny bit simpler. pong.c is a simple pong-like game.
+
 These files in the "defs" folder are distributed under the same license as
 the source assembly files. The convertdefs.py, foenix.h and other files are
 available under the Apache 2.0 license as specified in the LICENSE file.

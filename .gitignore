@@ -1,0 +1,7 @@
+*.hex
+*.map
+*.obj
+*.lst
+*.dat
+*.pal
+*.TMP

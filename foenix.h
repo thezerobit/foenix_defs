@@ -1,6 +1,7 @@
 #ifndef FOENIX_H
 #define FOENIX_H
 
+#include <sys/types.h>
 #include "defs/VKYII_CFP9553_GENERAL_def.h"
 #include "defs/VKYII_CFP9553_TILEMAP_def.h"
 #include "defs/VKYII_CFP9553_SPRITE_def.h"
@@ -101,6 +102,8 @@ typedef struct PaletteColor {
 #define VICKY_RAM_OFFSET 0xB00000
 #define SPRITE_SIZE 1024
 #define SPRITE_SCREEN_OFFSET 32
+#define SPRITE_WIDTH 32
+#define SPRITE_MAX 64
 #define spriteImageLoc(spriteImageNumber, spriteVideoLoc) u8Ptr(VICKY_RAM_OFFSET + (spriteVideoLoc) + (SPRITE_SIZE * (spriteNumber)))
 
 typedef struct Sprite {
@@ -114,7 +117,6 @@ typedef struct Sprite {
 #define SPRITE_CONTROL      ((Sprite *)SP00_CONTROL_REG)
 #define SPRITE_PALETTE_MASK 0x0E
 #define SPRITE_DEPTH_MASK   0x70
-
 
 /* num is from 0 to 31 or 63 */
 /* enable is a bool */
