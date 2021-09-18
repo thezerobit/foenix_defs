@@ -13,6 +13,16 @@ The engine.h / engine.c files represent a proof-of-concept level implementation
 of a game engine that takes care of interrupt handling and makes building games
 a tiny bit simpler. pong.c is a simple pong-like game.
 
+pong TODO:
+
+* score
+* keyboard support
+* SNES/NES support
+* paddle support
+* AI for single player mode
+* Title / 1 or 2 player / controller select screen
+
 These files in the "defs" folder are distributed under the same license as
-the source assembly files. The convertdefs.py, foenix.h and other files are
+the source assembly files. fxloader.asm is licensed as specified within the file.
+The convertdefs.py, foenix.h, engine.c, engine.h and other files are
 available under the Apache 2.0 license as specified in the LICENSE file.

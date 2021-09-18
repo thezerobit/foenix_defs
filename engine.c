@@ -9,12 +9,18 @@ u8_t _VideoRes;
 
 u8_t _VideoBorderX;
 u8_t _VideoBorderY;
-u8_t _VideoBorderRed;
-u8_t _VideoBorderGreen;
-u8_t _VideoBorderBlue;
+BGRColor _VideoBorderColor;
+BGRColor _VideoBackgroundColor;
 
 u16_t _VideoFrameCounter;
 u16_t _VideoLastFrame;
+
+bool  _textEnabled;
+bool  _textScreenWidth;
+bool  _textScreenHeight;
+bool  _textCursorEnabled;
+TextCursorControl _textCursorControl;
+bool  _textClearScreen;
 
 EngineUpdateCallback _UpdateCallback;
 
@@ -24,6 +30,22 @@ Sprite _SpriteControlBuffer[SPRITE_MAX];
 
 KeyCodes _KeyCodes;
 KeyCodes _KeyCodesCopy;
+
+u16_t _PSG_Timers[4];
+u16_t _PSG_NoteVals[12] = {
+	0x3f9,
+	0x3c0,
+	0x38a,
+	0x357,
+	0x327,
+	0x2fa,
+	0x2cf,
+	0x2a7,
+	0x281,
+	0x25d,
+	0x23b,
+	0x21b
+};
 
 bool _RNGinitiated = false;
 
@@ -63,17 +85,37 @@ void engineInit(void) {
 	_VideoRes = VIDEO_RES_320x240;
     _VideoBorderX = 0;
     _VideoBorderY = 0;
-    _VideoBorderRed = 0;
-    _VideoBorderGreen = 0;
-    _VideoBorderBlue = 0;
+	_VideoBorderColor.r = 0;
+	_VideoBorderColor.g = 0;
+	_VideoBorderColor.b = 0;
+	_VideoBackgroundColor.r = 0;
+	_VideoBackgroundColor.g = 0;
+	_VideoBackgroundColor.b = 0;
+
 
 	_VideoFrameCounter = 0;
 	_VideoLastFrame = 0;
+
+	_textEnabled = false;
+	_textScreenWidth = 80;
+	_textScreenWidth = 60;
+	_textCursorEnabled = false;
+	_textCursorControl.control = 0;
+	_textCursorControl.textBufferOffset = 0;
+	_textCursorControl.locX = 0;
+	_textCursorControl.locY = 0;
+	_textCursorControl.character = 0xB1; /* filled block */
+	_textCursorControl.color = 0xF0;
+	_textClearScreen = false;
 
 	_SpriteCount = 0;
 	_SpriteRAM = 0;
 
 	_KeyCodes.count = 0;
+
+	for(i = 0; i < 4; ++i) {
+		_PSG_Timers[i] = 0;
+	}
 
 	/* initialize sprite control buffer to zeroes */
 	memset((void *)_SpriteControlBuffer, 0, SPRITE_MAX * sizeof(Sprite));
@@ -95,8 +137,33 @@ void engineEnableSprites(u16_t numSpriteImages, u16_t numSprites) {
 	memset((void * )(_SpriteRAM + VICKY_RAM_OFFSET), 0, SPRITE_SIZE * numSpriteImages);
 }
 
+void engineEnableText(bool clearScreen, bool cursorEnabled) {
+	_textEnabled = true;
+	_textCursorEnabled = cursorEnabled;
+	_VideoFlags = _VideoFlags | VIDEO_TEXT | VIDEO_TEXT_OVERLAY;
+	_textClearScreen = clearScreen;
+}
+
 void engineSetResolution(u8_t videoRes) {
 	_VideoRes = videoRes;
+	switch (videoRes) {
+		case VIDEO_RES_320x240:
+			_textScreenWidth = 40;
+			_textScreenHeight = 30;
+			break;
+		case VIDEO_RES_400x300:
+			_textScreenWidth = 50;
+			_textScreenHeight = 37;
+			break;
+		case VIDEO_RES_640x480:
+			_textScreenWidth = 80;
+			_textScreenHeight = 60;
+			break;
+		case VIDEO_RES_800x600:
+			_textScreenWidth = 100;
+			_textScreenHeight = 75;
+			break;
+	}
 }
 
 void engineSetBorderSize(u8_t x, u8_t y) {
@@ -105,13 +172,31 @@ void engineSetBorderSize(u8_t x, u8_t y) {
 }
 
 void engineSetBorderColor(u8_t r, u8_t g, u8_t b) {
-	_VideoBorderRed = r;
-	_VideoBorderGreen = g;
-	_VideoBorderBlue = b;
+	_VideoBorderColor.r = r;
+	_VideoBorderColor.g = g;
+	_VideoBorderColor.b = b;
+}
+
+void engineSetBackgroundColor(u8_t r, u8_t g, u8_t b) {
+	_VideoBackgroundColor.r = r;
+	_VideoBackgroundColor.g = g;
+	_VideoBackgroundColor.b = b;
 }
 
 void engineSetUpdateCallback(EngineUpdateCallback callback) {
 	_UpdateCallback = callback;
+}
+
+void updatePSG(void) {
+	u16_t tone;
+	/* psg */
+	for (tone = 0; tone < 4; ++tone) {
+		if (_PSG_Timers[tone]) {
+			if (!--_PSG_Timers[tone]) {
+				psgSetVol(tone, 0);
+			}
+		}
+	}
 }
 
 void engineRun(void) {
@@ -131,6 +216,20 @@ void engineRun(void) {
 	}
 	videoMode(_VideoFlags);
 	videoBorderSize(_VideoBorderX, _VideoBorderY);
+	VIDEO_BORDER_COLOR = _VideoBorderColor;
+	VIDEO_BACKGROUND_COLOR = _VideoBackgroundColor;
+
+
+	if (_textEnabled) {
+		if (_textCursorEnabled) {
+			memcpy((void *)VKY_TXT_CURSOR_CTRL_REG, (void *)&_textCursorControl, sizeof(TextCursorControl));
+		}
+		if (_textClearScreen) {
+			memset((void *)textScreen, ' ', 0x2000);
+			memset((void *)textColor, 0xF0, 0x2000);
+		}
+	}
+
 	mouseDisable();
 
 	irqEnableStartOfFrame();
@@ -144,6 +243,12 @@ void engineRun(void) {
 			/* copy sprite control data */
 			memcpy((void *)SP00_CONTROL_REG, (void *)_SpriteControlBuffer, _SpriteCount * sizeof(Sprite));
 
+			if (_textCursorEnabled) {
+				memcpy((void *)VKY_TXT_CURSOR_CTRL_REG, (void *)&_textCursorControl, sizeof(TextCursorControl));
+			}
+
+			updatePSG();
+
 			/* disabling IRQ to copy _KeyCodes structure which otherwise can be modified
 			   by an interrupt at any time */
 			irqDisable();
@@ -153,6 +258,47 @@ void engineRun(void) {
 
 			_UpdateCallback(_VideoFrameCounter, &_KeyCodesCopy);
 		}
+	}
+}
+
+void engineCursorSetLocation(u16_t x, u16_t y) {
+	_textCursorControl.locX = x;
+	_textCursorControl.locY = y;
+}
+
+void engineCursorShow(void) {
+	_textCursorControl.control = _textCursorControl.control | Vky_Cursor_Enable;
+}
+void engineCursorHide(void) {
+	_textCursorControl.control = _textCursorControl.control & ~Vky_Cursor_Enable;
+}
+
+void engineCursorSetCharacter(u8_t c) {
+	_textCursorControl.character = c;
+}
+
+void _engineCursorNewLine(void) {
+	_textCursorControl.locX = 0;
+	_textCursorControl.locY++;
+	if (_textCursorControl.locY >= _textScreenHeight) {
+		_textCursorControl.locY = _textScreenHeight - 1;
+		_textCursorControl.textBufferOffset++; /* TODO reset to top if we get too far down */
+	}
+}
+
+void enginePutChar(u8_t c) {
+	switch (c)
+	{
+	case '\n':
+		_engineCursorNewLine();
+		break;
+	default:
+		textScreen[_textCursorControl.locX + (_textCursorControl.locY + _textCursorControl.textBufferOffset) * _textScreenWidth] = c;
+		_textCursorControl.locX ++;
+		if (_textCursorControl.locX >= _textScreenWidth) {
+			_engineCursorNewLine();
+		}
+		break;
 	}
 }
 
@@ -180,6 +326,34 @@ void spritePosition(u16_t idx, u16_t x, u16_t y) {
 void spriteImage(u16_t sprite, u16_t image) {
 	u32_t addr = _SpriteRAM + image * SPRITE_SIZE;
 	copy24BitAddr(addr, _SpriteControlBuffer[sprite].address);
+}
+
+u8_t toHexChar(u8_t val) {
+	if (val < 10) {
+		return val + 48;
+	} else {
+		return val + 55;
+	}
+}
+
+void printHexByte(u8_t value) {
+	enginePutChar(toHexChar((value & 0xF0) >> 4));
+	enginePutChar(toHexChar(value & 0x0F));
+}
+
+/*
+tone is 0 to 2, note is 0 to 11 (A to G#), octave is 0 to 5-ish, volume is 0 to 15
+*/
+void psgPlayNote(u16_t tone, u16_t note, u16_t octave, u16_t volume, u16_t frames) {
+	u16_t val = _PSG_NoteVals[note] >> octave;
+	u8_t sendByte;
+	sendByte = 0x80 | tone << 5 | (val & 0x0F);
+	psgSendByte(0x80 | tone << 5 | (val & 0x0F));
+
+	sendByte = (val >> 4) & 0x3F;
+	psgSendByte((val >> 4) & 0x3F);
+	psgSetVol(tone, volume);
+	_PSG_Timers[tone] = frames;
 }
 
 void rngInit(void) {

@@ -10,6 +10,7 @@
 #include "defs/RTC_def.h"
 #include "defs/GABE_Control_Registers_def.h"
 #include "defs/Trinity_CFP9301_def.h"
+#include "defs/Math_def.h"
 
 /* helpers */
 
@@ -26,12 +27,29 @@
 	(target)[1] = (u8_t)((addr) >> 8); \
 	(target)[2] = (u8_t)((addr) >> 16)
 
+/* math */
+
+/* quo and rem must be assignable u16_t variables */
+#define UNSIGNED_DIV(num, dem, quo, rem) u16(UNSIGNED_DIV_NUM_LO) = num;\
+    u16(UNSIGNED_DIV_DEM_LO) = dem;\
+    quo = u16(UNSIGNED_DIV_QUO_LO);\
+    rem = u16(UNSIGNED_DIV_REM_LO)
+
 /* keyboard */
 
 #define keyGetCode() u8(KBD_INPT_BUF)
 #define keyIsPressed(code) !((code) & 0x80)
 #define keyIsReleased(code) ((code) & 0x80)
 #define keyScanCode(code) ((code) & 0x7F)
+
+#define KEY_UP      0x48
+#define KEY_DOWN    0x50
+#define KEY_LEFT    0x4B
+#define KEY_RIGHT   0x4D
+#define KEY_F1      0x3B
+#define KEY_F2      0x3C
+#define KEY_F3      0x3D
+#define KEY_F4      0x3E
 
 /* mouse */
 
@@ -61,7 +79,22 @@
 #define video640x480() u8(MASTER_CTRL_REG_H) = 0
 #define video800x600() u8(MASTER_CTRL_REG_H) = Mstr_Ctrl_Video_Mode0
 
+typedef struct BGRColor {
+	u8_t b;
+	u8_t g;
+	u8_t r;
+} BGRColor;
+
+#define VIDEO_BORDER_COLOR (*(BGRColor *)BORDER_COLOR_B)
+#define VIDEO_BACKGROUND_COLOR (*(BGRColor *)BORDER_COLOR_B)
+
 #define videoBorderSize(x, y) u8(BORDER_X_SIZE) = x; u8(BORDER_Y_SIZE) = y
+#define videoBorderColor(r, g, b) u8(BORDER_COLOR_R) = r; \
+	u8(BORDER_COLOR_G) = g; \
+	u8(BORDER_COLOR_B) = b
+#define videoBackgroundColor(r, g, b) u8(BACKGROUND_COLOR_R) = r; \
+	u8(BACKGROUND_COLOR_G) = g; \
+	u8(BACKGROUND_COLOR_B) = b
 
 #define VIDEO_TEXT         Mstr_Ctrl_Text_Mode_En
 #define VIDEO_TEXT_OVERLAY Mstr_Ctrl_Text_Overlay
@@ -74,10 +107,47 @@
 #define videoMode(flags)   u8(MASTER_CTRL_REG_L) = (flags)
 /* example: videoMode(VIDEO_GRAPHICS | VIDEO_SPRITE | VIDEO_TEXT | VIDEO_TEXT_OVERLAY); */
 
+/* SOUND */
+
+#define PSG_BASE_ADDRESS 0xAFF100
+#define PSG_CLOCK_FREQ_HZ 3579545
+#define PSG_X_DEC 111860.78125
+#define PSG_X_INT 111861
+
+#define PSG_NOTE_A  0x3f9
+#define PSG_NOTE_A# 0x3c0
+#define PSG_NOTE_B  0x38a
+#define PSG_NOTE_C  0x357
+#define PSG_NOTE_C# 0x327
+#define PSG_NOTE_D  0x2fa
+#define PSG_NOTE_D# 0x2cf
+#define PSG_NOTE_E  0x2a7
+#define PSG_NOTE_F  0x281
+#define PSG_NOTE_F# 0x25d
+#define PSG_NOTE_G  0x23b
+#define PSG_NOTE_G# 0x21b
+/* tone is from 0 to 3 (3 = noise) */
+/* vol is from 0 (off) to 15 (loudest) */
+#define psgSetVol(tone, vol) u8(PSG_BASE_ADDRESS) = 0x90 | ((tone) << 5) | (15 - (vol))
+#define psgSendByte(byte) u8(PSG_BASE_ADDRESS) = (byte)
+
 /* text */
+
+#define TEXT_SCREEN_SIZE 0x2000
 
 #define textScreen u8Ptr(CS_TEXT_MEM_PTR)
 #define textColor  u8Ptr(CS_COLOR_MEM_PTR)
+
+typedef struct TextCursorControl {
+	u8_t control;
+	u8_t textBufferOffset;
+	u8_t character;
+	u8_t color;
+	u16_t locX;
+	u16_t locY;
+} TextCursorControl;
+
+#define TEXT_CURSOR_CTRL (*(TextCursorControl *)VKY_TXT_CURSOR_CTRL_REG)
 
 /* palettes a.k.a color lookup tables "LUT" */
 
