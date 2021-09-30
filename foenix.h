@@ -11,11 +11,14 @@
 #include "defs/GABE_Control_Registers_def.h"
 #include "defs/Trinity_CFP9301_def.h"
 #include "defs/Math_def.h"
+#include "defs/timer_def.h"
+#include "defs/super_io_def.h"
 
 /* helpers */
 
 #define u8(addr)    (*(volatile unsigned char *)addr)
 #define u16(addr)   (*(volatile unsigned short *)addr)
+#define u32(addr)   (*(volatile unsigned long *)addr)
 #define u8Ptr(addr) ((volatile unsigned char *)addr)
 
 #define setBits8(addr, bits) u8(addr) = u8(addr) | (bits)
@@ -115,17 +118,17 @@ typedef struct BGRColor {
 #define PSG_X_INT 111861
 
 #define PSG_NOTE_A  0x3f9
-#define PSG_NOTE_A# 0x3c0
+#define PSG_NOTE_As 0x3c0
 #define PSG_NOTE_B  0x38a
 #define PSG_NOTE_C  0x357
-#define PSG_NOTE_C# 0x327
+#define PSG_NOTE_Cs 0x327
 #define PSG_NOTE_D  0x2fa
-#define PSG_NOTE_D# 0x2cf
+#define PSG_NOTE_Ds 0x2cf
 #define PSG_NOTE_E  0x2a7
 #define PSG_NOTE_F  0x281
-#define PSG_NOTE_F# 0x25d
+#define PSG_NOTE_Fs 0x25d
 #define PSG_NOTE_G  0x23b
-#define PSG_NOTE_G# 0x21b
+#define PSG_NOTE_Gs 0x21b
 /* tone is from 0 to 3 (3 = noise) */
 /* vol is from 0 (off) to 15 (loudest) */
 #define psgSetVol(tone, vol) u8(PSG_BASE_ADDRESS) = 0x90 | ((tone) << 5) | (15 - (vol))
@@ -271,6 +274,8 @@ typedef struct TilesetConfig {
 
 /* interrupts */
 
+#define IRQ_VECTOR 0x00FFEE
+
 #define irqEnable()  asm { cli; }
 #define irqDisable() asm { sei; }
 #define irqWait()    asm { wai; }
@@ -279,6 +284,8 @@ typedef struct TilesetConfig {
 #define irqDisableStartOfFrame() setBits8(INT_MASK_REG0, FNX0_INT00_SOF)
 #define irqEnableKeyboard()  unsetBits8(INT_MASK_REG1, FNX1_INT00_KBD)
 #define irqDisableKeyboard() setBits8(INT_MASK_REG1, FNX1_INT00_KBD)
+#define irqEnableTimer0()  unsetBits8(INT_MASK_REG0, FNX0_INT02_TMR0)
+#define irqDisableTimer0() setBits8(INT_MASK_REG0, FNX0_INT02_TMR0)
 
 /* random number generator */
 

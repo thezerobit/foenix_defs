@@ -1,7 +1,5 @@
 #include "engine.h"
 
-void Update(u16_t frame, KeyCodes * keyCodes);
-
 typedef struct Vec {
 	i16_t x;
 	i16_t y;
@@ -15,11 +13,9 @@ typedef struct Thing {
 	u16_t spriteIdx;
 } Thing;
 
-void setPosition(Thing thing) {
-	spritePosition(thing.spriteIdx, (thing.loc.x >> 4) - thing.offset.x + 32, (thing.loc.y >> 4) - thing.offset.y + 32);
-}
-
 typedef enum State {
+	Start,
+	TitleScreen,
 	Waiting,
 	Playing
 } State;
@@ -35,6 +31,38 @@ Thing Puck, LeftPaddle, RightPaddle;
 Vec PuckVel;
 State GameState;
 u16_t WaitTimer;
+
+typedef enum {
+	INPUT_JOY_1,
+	INPUT_JOY_2,
+	INPUT_PADDLE_1,
+	INPUT_PADDLE_2,
+	INPUT_KEY_1,
+	INPUT_LAST,
+} Input;
+
+u8_t Player1Input = INPUT_JOY_1;
+u8_t Player2Input = INPUT_JOY_2;
+bool UpPressed = false;
+bool DownPressed = false;
+u16_t Player1Score;
+u16_t Player2Score;
+
+void setPosition(Thing thing);
+void doJoyMovement(u8_t joyState, Thing * paddle);
+void doPaddleMovement(u16_t paddlePos, Thing * paddle);
+void doKeyboardMovement(Thing * paddle, KeyCodes * keyCodes);
+void UpdatePuck(void);
+void StartAction(void);
+u8_t * GetInputName(u8_t input);
+void ClearTitleScreen(void);
+void DrawTitleScreen(void);
+void DrawScores(void);
+void doFKeyActions(KeyCodes * keyCodes);
+void doInput(Thing * paddle, u8_t input, KeyCodes * keyCodes);
+void doInputs(KeyCodes * keyCodes);
+void Update(u16_t frame, KeyCodes * keyCodes);
+
 
 void main(void) {
 	u16_t x, y;
@@ -71,8 +99,7 @@ void main(void) {
 	PuckVel.y = 1 * 16;
 
 	WaitTimer = 60;
-	GameState = Waiting;
-	spriteEnable(Puck.spriteIdx, false);
+	GameState = Start;
 
 	/* draw puck */
 	for (y = 0; y < PuckSize; ++y) {
@@ -102,10 +129,6 @@ void main(void) {
 		}
 	}
 
-	spriteEnable(Puck.spriteIdx, true);
-	spriteEnable(LeftPaddle.spriteIdx, true);
-	spriteEnable(RightPaddle.spriteIdx, true);
-
 	spriteImage(Puck.spriteIdx, Puck.spriteImage);
 	spriteImage(LeftPaddle.spriteIdx, LeftPaddle.spriteImage);
 	spriteImage(RightPaddle.spriteIdx, RightPaddle.spriteImage);
@@ -119,7 +142,11 @@ void main(void) {
 	engineRun();
 }
 
-void doPaddleMovement(u8_t joyState, Thing * paddle) {
+void setPosition(Thing thing) {
+	spritePosition(thing.spriteIdx, (thing.loc.x >> 4) - thing.offset.x + 32, (thing.loc.y >> 4) - thing.offset.y + 32);
+}
+
+void doJoyMovement(u8_t joyState, Thing * paddle) {
 	if (joyState & JOY_UP) {
 		paddle->loc.y -= PaddleMoveSpeed;
 		if (paddle->loc.y < PaddleMinY) {
@@ -127,6 +154,50 @@ void doPaddleMovement(u8_t joyState, Thing * paddle) {
 		}
 	}
 	if (joyState & JOY_DOWN) {
+		paddle->loc.y += PaddleMoveSpeed;
+		if (paddle->loc.y > PaddleMaxY) {
+			paddle->loc.y = PaddleMaxY;
+		}
+	}
+}
+
+void doPaddleMovement(u16_t paddlePos, Thing * paddle) {
+	/* range 15 to 54 */
+	if (paddlePos < 15) {
+		paddlePos = 15;
+	}
+	if (paddlePos > 55) {
+		paddlePos = 55;
+	}
+	paddlePos = paddlePos - 15;
+	paddle->loc.y = paddlePos * 6 * 16;
+}
+
+void doKeyboardMovement(Thing * paddle, KeyCodes * keyCodes) {
+	u8_t code;
+	bool down;
+	u16_t i;
+	for (i = 0; i < keyCodes->count; ++i) {
+		code = keyCodes->buffer[i];
+		down = keyIsPressed(code);
+		switch (keyScanCode(code)) {
+			case 0x48: // UP
+				UpPressed = down;
+				break;
+			case 0x50: // DOWN
+				DownPressed = down;
+				break;
+			default:
+				break;
+		};
+	}
+	if (UpPressed) {
+		paddle->loc.y -= PaddleMoveSpeed;
+		if (paddle->loc.y < PaddleMinY) {
+			paddle->loc.y = PaddleMinY;
+		}
+	}
+	if (DownPressed) {
 		paddle->loc.y += PaddleMoveSpeed;
 		if (paddle->loc.y > PaddleMaxY) {
 			paddle->loc.y = PaddleMaxY;
@@ -152,6 +223,8 @@ void UpdatePuck(void) {
 		psgPlayNote(0, 0, 2, 15, 5);
 	} else if (Puck.loc.x < 0) {
 		/* score point for player 2 */
+		Player2Score++;
+		DrawScores();
 		Puck.loc.x = 160 << 4;
 		Puck.loc.y = 120 << 4;
 		PuckVel.x = -2 * 16;
@@ -163,6 +236,8 @@ void UpdatePuck(void) {
 		spriteEnable(Puck.spriteIdx, false);
 	} else if (Puck.loc.x > (320 << 4)) {
 		/* score point for player 1 */
+		Player1Score++;
+		DrawScores();
 		Puck.loc.x = 160 << 4;
 		Puck.loc.y = 120 << 4;
 		PuckVel.x = -2 * 16;
@@ -181,48 +256,149 @@ void UpdatePuck(void) {
 	}
 }
 
-void Update(u16_t frame, KeyCodes * keyCodes) {
-	u16_t i;
-	u8_t code;
+void StartAction(void) {
+	GameState = Waiting;
+	WaitTimer = 60;
+	spriteEnable(Puck.spriteIdx, false);
+	spriteEnable(LeftPaddle.spriteIdx, true);
+	spriteEnable(RightPaddle.spriteIdx, true);
+	engineClearText(' ');
+	Player1Score = 0;
+	Player2Score = 0;
+	DrawScores();
+}
+
+u8_t * GetInputName(u8_t input) {
+	switch(input) {
+		case INPUT_JOY_1:
+			return "JOYSTICK 1";
+		case INPUT_JOY_2:
+			return "JOYSTICK 2";
+		case INPUT_PADDLE_1:
+			return "PADDLE 1";
+		case INPUT_PADDLE_2:
+			return "PADDLE 2";
+		case INPUT_KEY_1:
+			return "KEYBOARD";
+		default:
+			return "UNKNOWN";
+	}
+}
+
+void ClearTitleScreen(void) {
+	enginePlaceText("   ", 16, 10);
+	enginePlaceText("                              ", 5, 13);
+	enginePlaceText("                              ", 5, 16);
+	enginePlaceText("                              ", 5, 19);
+}
+
+void DrawTitleScreen(void) {
+	u8_t * text;
+	enginePlaceText("PONG", 16, 10);
+	enginePlaceText("(F1) PLAYER 1:", 5, 13);
+	text = GetInputName(Player1Input);
+	enginePlaceText(text, 20, 13);
+	enginePlaceText("(F2) PLAYER 2:", 5, 16);
+	text = GetInputName(Player2Input);
+	enginePlaceText(text, 20, 16);
+	enginePlaceText("(F3) START GAME", 10, 19);
+}
+
+void DrawScores(void) {
+	enginePlaceU16(Player1Score, 5, 3);
+	enginePlaceU16(Player2Score, 22, 3);
+}
+
+void doFKeyActions(KeyCodes * keyCodes) {
+	u16_t i, code, j;
 	bool down;
-	u16_t volume;
-	/* psg set volume based on F1 to F4 */
 	for (i = 0; i < keyCodes->count; ++i) {
 		code = keyCodes->buffer[i];
-		volume = keyIsPressed(code) ? 15 : 0;
+		down = keyIsPressed(code);
 		switch (keyScanCode(keyCodes->buffer[i])) {
 			case KEY_F1:
-				psgSetVol(0, volume);
+				if (down) {
+					Player1Input++;
+					if (Player1Input == INPUT_LAST) {
+						Player1Input = INPUT_JOY_1;
+					}
+				}	
+				ClearTitleScreen();
+				DrawTitleScreen();
 				break;
 			case KEY_F2:
-				psgSetVol(1, volume);
+				if (down) {
+					Player2Input++;
+					if (Player2Input == INPUT_LAST) {
+						Player2Input = INPUT_JOY_1;
+					}
+				}
+				ClearTitleScreen();
+				DrawTitleScreen();
 				break;
 			case KEY_F3:
-				psgSetVol(2, volume);
+				if (down) {
+					StartAction();
+				}
 				break;
 			case KEY_F4:
-				psgSetVol(3, volume);
 				break;
 		}
 	}
+}
 
+void doInput(Thing * paddle, u8_t input, KeyCodes * keyCodes) {
+	u16_t paddleVal;
+	switch(input) {
+		case INPUT_JOY_1:
+			doJoyMovement(joyGetState(0), paddle);
+			break;
+		case INPUT_JOY_2:
+			doJoyMovement(joyGetState(1), paddle);
+			break;
+		case INPUT_PADDLE_1:
+			doPaddleMovement(pollPaddle(0), paddle);
+			break;
+		case INPUT_PADDLE_2:
+			doPaddleMovement(pollPaddle(1), paddle);
+			break;
+		case INPUT_KEY_1:
+			doKeyboardMovement(paddle, keyCodes);
+			break;
+		default:
+			break;
+	}
+}
+
+void doInputs(KeyCodes * keyCodes) {
+	doInput(&LeftPaddle, Player1Input, keyCodes);
+	doInput(&RightPaddle, Player2Input, keyCodes);
+}
+
+void Update(u16_t frame, KeyCodes * keyCodes) {
 	switch (GameState) {
+		case Start:
+			DrawTitleScreen();
+			GameState = TitleScreen;
+			break;
+		case TitleScreen:
+			doFKeyActions(keyCodes);
+			break;
 		case Waiting:
+			doInputs(keyCodes);
+			setPosition(LeftPaddle);
+			setPosition(RightPaddle);
 			if (!WaitTimer--) {
 				GameState = Playing;
 				spriteEnable(Puck.spriteIdx, true);
 			}
 			break;
 		case Playing:
+			doInputs(keyCodes);
 			UpdatePuck();
+			setPosition(Puck);
+			setPosition(LeftPaddle);
+			setPosition(RightPaddle);
 			break;
 	}
-
-	doPaddleMovement(joyGetState(0), &LeftPaddle);
-	doPaddleMovement(joyGetState(1), &RightPaddle);
-	
-
-	setPosition(Puck);
-	setPosition(LeftPaddle);
-	setPosition(RightPaddle);
 }

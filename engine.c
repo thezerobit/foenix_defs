@@ -1,6 +1,10 @@
 #include <STRING.H>
 #include "engine.h"
 
+extern void POLL_PADDLE(void);
+extern u8_t WHICH_PADDLE;
+extern u8_t RETURN_PADDLE;
+
 /* state */
 
 u16_t _VideoFlags;
@@ -49,6 +53,8 @@ u16_t _PSG_NoteVals[12] = {
 
 bool _RNGinitiated = false;
 
+volatile u16_t _Timer0Counter;
+
 /* interrupt callbacks */
 
 void COPHandler(void) {
@@ -58,9 +64,15 @@ void BRKHandler(void) {
 }
 
 void IRQHandler(void) {
-	if (u8(INT_PENDING_REG0) & FNX0_INT00_SOF) {
-		u8(INT_PENDING_REG0) = FNX0_INT00_SOF;
-		_VideoFrameCounter++;
+	if (INT_PENDING_REG0) {
+		if (u8(INT_PENDING_REG0) & FNX0_INT00_SOF) {
+			u8(INT_PENDING_REG0) = FNX0_INT00_SOF;
+			_VideoFrameCounter++;
+		}
+		if (u8(INT_PENDING_REG0) & FNX0_INT02_TMR0) {
+			u8(INT_PENDING_REG0) = FNX0_INT02_TMR0;
+			_Timer0Counter++;
+		}
 	}
 	if (u8(INT_PENDING_REG1) & FNX1_INT00_KBD) {
 		u8(INT_PENDING_REG1) = FNX1_INT00_KBD;
@@ -302,6 +314,32 @@ void enginePutChar(u8_t c) {
 	}
 }
 
+void enginePlaceText(u8_t * text, u16_t x, u16_t y) {
+	u16_t i = 0;
+	u8_t nextChar;
+	while (nextChar = text[i++]) {
+		textScreen[x + i + y * _textScreenWidth] = nextChar;
+	}
+}
+
+void enginePlaceU16(u16_t value, u16_t x, u16_t y) {
+	u16_t nextDigit, i;
+	u8_t digits[6];
+	digits[5] = 0;
+	for (i = 0; i < 5; ++i) {
+		digits[i] = ' ';
+	}
+	for (i = 4; i <= 4 && value; --i) {
+		UNSIGNED_DIV(value, 10, value, nextDigit);
+		digits[i] = nextDigit + 48;
+	}
+	enginePlaceText(digits, x, y);
+}
+
+void engineClearText(u8_t fillChar) {
+	memset((void *)textScreen, fillChar, 0x2000);
+}
+
 u8_t * spriteGetImage(u16_t spriteImg) {
 	return (u8_t *)(VICKY_RAM_OFFSET + _SpriteRAM + spriteImg * SPRITE_SIZE);
 }
@@ -341,6 +379,12 @@ void printHexByte(u8_t value) {
 	enginePutChar(toHexChar(value & 0x0F));
 }
 
+void printHexWord(u16_t value) {
+	printHexByte(value >> 8);
+	printHexByte(value & 0xFF);
+	enginePutChar('\n');
+}
+
 /*
 tone is 0 to 2, note is 0 to 11 (A to G#), octave is 0 to 5-ish, volume is 0 to 15
 */
@@ -369,4 +413,72 @@ void rngInit(void) {
 	asm { nop; nop; nop; }
 	/* Turn on the random number generator */
 	u8(GABE_RNG_CTRL) = GABE_RNG_CTRL_EN;
+}
+
+/* whichPaddle is 0 - 3 */
+u16_t pollPaddle(u8_t whichPaddle) {
+	u16_t time, ignore, result;
+	u32_t savedInterrupts;
+
+	savedInterrupts = u32(INT_MASK_REG0);
+	u32(INT_MASK_REG0) = ~FNX0_INT02_TMR0; /* only timer 0 IRQ */
+
+    u8(TIMER0_CTRL_REG) = TMR0_SCLR; /* disable timer, allow Output to be reset */
+    u8(TIMER0_CMP_REG) = TMR0_CMP_RECLR; /* allow Output to be reset */
+
+	u16(TIMER0_CHARGE_L) = 0;
+	u8(TIMER0_CHARGE_H) = 0;
+
+	u16(TIMER0_CMP_L) = u16(TIMER0_CHARGE_L); /* reset timer Output to 0 */
+    u8(TIMER0_CMP_H) = u8(TIMER0_CHARGE_H);
+
+	u16(TIMER0_CMP_L) = 1600;
+    u8(TIMER0_CMP_H) = 0;
+
+	WHICH_PADDLE = 1 << whichPaddle; /* the POLL_PADDLE function uses this */
+
+	u8(SIO_JOY) = 0x00; /* initiate analog read */
+
+    u8(TIMER0_CTRL_REG) = TMR0_EN | TMR0_UPDWN | TMR0_SCLR; /* start timer */
+
+	POLL_PADDLE();
+
+	time = u16(TIMER0_CHARGE_L);
+
+	irqWait();
+	u8(TIMER0_CTRL_REG) = 0; /* disable Timer 0 */
+
+	u32(INT_MASK_REG0) = savedInterrupts; 
+	irqEnable();
+
+	UNSIGNED_DIV(time - 46, 19, result, ignore);
+
+	return result;
+}
+
+void delayCycles(u16_t cycles) {
+	irqDisableKeyboard();
+	irqDisableStartOfFrame();
+
+	u8(TIMER0_CTRL_REG) = 0;
+	irqEnableTimer0();
+	u8(TIMER0_CHARGE_L) = 0;
+	u8(TIMER0_CHARGE_M) = 0;
+	u8(TIMER0_CHARGE_H) = 0;
+
+	u8(TIMER0_CMP_L) = cycles & 0xFF;
+    u8(TIMER0_CMP_M) = cycles >> 8;
+    u8(TIMER0_CMP_H) = 0;
+
+    u8(TIMER0_CMP_REG) = TMR0_CMP_RECLR;
+    u8(TIMER0_CTRL_REG) = TMR0_EN | TMR0_UPDWN | TMR0_SCLR;
+
+	irqWait();
+
+	irqDisableTimer0();
+
+	u8(TIMER0_CTRL_REG) = 0; /* disable Timer 0 if it is running */
+
+	irqEnableKeyboard();
+	irqEnableStartOfFrame();
 }

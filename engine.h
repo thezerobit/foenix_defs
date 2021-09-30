@@ -40,6 +40,9 @@ void engineCursorShow(void);
 void engineCursorHide(void);
 void engineCursorSetCharacter(u8_t c);
 void enginePutChar(u8_t c);
+void enginePlaceText(u8_t * text, u16_t x, u16_t y);
+void enginePlaceU16(u16_t value, u16_t x, u16_t y);
+void engineClearText(u8_t fillChar);
 
 /* sprites */
 
@@ -57,5 +60,11 @@ void psgPlayNote(u16_t tone, u16_t note, u16_t octave, u16_t volume, u16_t frame
 /* random number generator */
 
 void rngInit(void);
+
+/* paddles */
+
+/* uses Timer 0, turns off other interrupts, takes 1600-ish cycles */
+u16_t pollPaddle(u8_t whichPaddle);
+void delayCycles(u16_t cycles);
 
 #endif
