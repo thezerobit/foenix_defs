@@ -28,7 +28,9 @@ const PaddleMinY = 0;
 const PaddleMaxY = 240 << 4;
 
 Thing Puck, LeftPaddle, RightPaddle;
-Vec PuckVel;
+u16_t PuckDirection; /* 0 to 63 from pointing upwards, clockwise */
+i16_t PuckSpeed; /* ~ 36 */
+Vec PuckVel; /* derived from PuckDirection and PuckSpeed */
 State GameState;
 u16_t WaitTimer;
 
@@ -48,11 +50,19 @@ bool DownPressed = false;
 u16_t Player1Score;
 u16_t Player2Score;
 
+u16_t SinLookup[16] = {
+	0, 25, 50, 74, 98, 121, 142, 162,
+	181, 198, 213, 226, 237, 245, 251, 255
+};
+
 void setPosition(Thing thing);
 void doJoyMovement(u8_t joyState, Thing * paddle);
 void doPaddleMovement(u16_t paddlePos, Thing * paddle);
 void doKeyboardMovement(Thing * paddle, KeyCodes * keyCodes);
 void UpdatePuck(void);
+void PlayTritone(void);
+void ResetPuck(void);
+void ReflectPuck(Thing * thing);
 void StartAction(void);
 u8_t * GetInputName(u8_t input);
 void ClearTitleScreen(void);
@@ -94,9 +104,6 @@ void main(void) {
 	RightPaddle.colorIdx = 3;
 	RightPaddle.spriteImage = 2;
 	RightPaddle.spriteIdx = 2;
-
-	PuckVel.x = -2 * 16;
-	PuckVel.y = 1 * 16;
 
 	WaitTimer = 60;
 	GameState = Start;
@@ -213,40 +220,24 @@ void UpdatePuck(void) {
 		&& ((Puck.loc.x - PuckVel.x) > LeftPaddle.loc.x)
 		&& (Puck.loc.y < (LeftPaddle.loc.y + PaddleHeight * 8))
 		&& (Puck.loc.y > (LeftPaddle.loc.y - PaddleHeight * 8))) {
-		PuckVel.x = -PuckVel.x; /* simple reflection */
-		psgPlayNote(0, 0, 2, 15, 5);
+		ReflectPuck(&LeftPaddle);
 	} else if ((PuckVel.x > 0) && (Puck.loc.x >= RightPaddle.loc.x) 
 		&& ((Puck.loc.x - PuckVel.x) < RightPaddle.loc.x)
 		&& (Puck.loc.y < (RightPaddle.loc.y + PaddleHeight * 8))
 		&& (Puck.loc.y > (RightPaddle.loc.y - PaddleHeight * 8))) {
-		PuckVel.x = -PuckVel.x; /* simple reflection */
-		psgPlayNote(0, 0, 2, 15, 5);
+		ReflectPuck(&RightPaddle);
 	} else if (Puck.loc.x < 0) {
 		/* score point for player 2 */
 		Player2Score++;
 		DrawScores();
-		Puck.loc.x = 160 << 4;
-		Puck.loc.y = 120 << 4;
-		PuckVel.x = -2 * 16;
-		PuckVel.y = 1 * 16;
-		psgPlayNote(0, 0, 0, 15, 60);
-		psgPlayNote(1, 6, 0, 15, 60);
-		GameState = Waiting;
-		WaitTimer = 60;
-		spriteEnable(Puck.spriteIdx, false);
+		ResetPuck();
+		PlayTritone();
 	} else if (Puck.loc.x > (320 << 4)) {
 		/* score point for player 1 */
 		Player1Score++;
 		DrawScores();
-		Puck.loc.x = 160 << 4;
-		Puck.loc.y = 120 << 4;
-		PuckVel.x = -2 * 16;
-		PuckVel.y = 1 * 16;
-		psgPlayNote(0, 0, 0, 15, 60);
-		psgPlayNote(1, 6, 0, 15, 60);
-		GameState = Waiting;
-		WaitTimer = 60;
-		spriteEnable(Puck.spriteIdx, false);
+		ResetPuck();
+		PlayTritone();
 	} else if ((Puck.loc.y < 0) && (PuckVel.y < 0)) {
 		PuckVel.y = -PuckVel.y;
 		psgPlayNote(0, 6, 1, 15, 5);
@@ -256,9 +247,27 @@ void UpdatePuck(void) {
 	}
 }
 
-void StartAction(void) {
+void PlayTritone(void) {
+	psgPlayNote(0, 0, 0, 15, 60);
+	psgPlayNote(1, 6, 0, 15, 60);
+}
+
+void ResetPuck(void) {
+	Puck.loc.x = 160 << 4;
+	Puck.loc.y = 120 << 4;
+	PuckVel.x = -2 * 16;
+	PuckVel.y = 1 * 16;
 	GameState = Waiting;
 	WaitTimer = 60;
+	spriteEnable(Puck.spriteIdx, false);
+}
+
+void ReflectPuck(Thing * thing) {
+	PuckVel.x = -PuckVel.x; /* simple reflection */
+	psgPlayNote(0, 0, 2, 15, 5);
+}
+
+void StartAction(void) {
 	spriteEnable(Puck.spriteIdx, false);
 	spriteEnable(LeftPaddle.spriteIdx, true);
 	spriteEnable(RightPaddle.spriteIdx, true);
@@ -266,6 +275,7 @@ void StartAction(void) {
 	Player1Score = 0;
 	Player2Score = 0;
 	DrawScores();
+	ResetPuck();
 }
 
 u8_t * GetInputName(u8_t input) {
