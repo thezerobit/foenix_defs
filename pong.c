@@ -28,8 +28,8 @@ const PaddleMinY = 0;
 const PaddleMaxY = 240 << 4;
 
 Thing Puck, LeftPaddle, RightPaddle;
-u16_t PuckDirection; /* 0 to 63 from pointing upwards, clockwise */
-i16_t PuckSpeed; /* ~ 36 */
+i16_t PuckDirection; /* 0 to 63 from pointing upwards, clockwise */
+u16_t PuckSpeed; /* ~ 36 */
 Vec PuckVel; /* derived from PuckDirection and PuckSpeed */
 State GameState;
 u16_t WaitTimer;
@@ -50,10 +50,24 @@ bool DownPressed = false;
 u16_t Player1Score;
 u16_t Player2Score;
 
-u16_t SinLookup[16] = {
-	0, 25, 50, 74, 98, 121, 142, 162,
-	181, 198, 213, 226, 237, 245, 251, 255
-};
+i16_t Sin[64] = {
+    0, 25, 50, 74, 98, 121, 142, 162, 
+    181, 198, 213, 226, 237, 245, 251, 255, 
+    256, 255, 251, 245, 237, 226, 213, 198, 
+    181, 162, 142, 121, 98, 74, 50, 25, 
+    0, -25, -50, -74, -98, -121, -142, -162, 
+    -181, -198, -213, -226, -237, -245, -251, -255, 
+    -256, -255, -251, -245, -237, -226, -213, -198, 
+    -181, -162, -142, -121, -98, -74, -50, -25};
+i16_t Cos[64] = {
+    256, 255, 251, 245, 237, 226, 213, 198, 
+    181, 162, 142, 121, 98, 74, 50, 25, 
+    0, -25, -50, -74, -98, -121, -142, -162, 
+    -181, -198, -213, -226, -237, -245, -251, -255, 
+    -256, -255, -251, -245, -237, -226, -213, -198, 
+    -181, -162, -142, -121, -98, -74, -50, -25, 
+    0, 25, 50, 74, 98, 121, 142, 162, 
+    181, 198, 213, 226, 237, 245, 251, 255};
 
 void setPosition(Thing thing);
 void doJoyMovement(u8_t joyState, Thing * paddle);
@@ -61,8 +75,10 @@ void doPaddleMovement(u16_t paddlePos, Thing * paddle);
 void doKeyboardMovement(Thing * paddle, KeyCodes * keyCodes);
 void UpdatePuck(void);
 void PlayTritone(void);
+void UpdatePuckVelocity(void);
 void ResetPuck(void);
 void ReflectPuck(Thing * thing);
+void WallBounce(void);
 void StartAction(void);
 u8_t * GetInputName(u8_t input);
 void ClearTitleScreen(void);
@@ -239,10 +255,10 @@ void UpdatePuck(void) {
 		ResetPuck();
 		PlayTritone();
 	} else if ((Puck.loc.y < 0) && (PuckVel.y < 0)) {
-		PuckVel.y = -PuckVel.y;
+		WallBounce();
 		psgPlayNote(0, 6, 1, 15, 5);
 	} else if ((Puck.loc.y > (240 << 4)) && (PuckVel.y > 0)) {
-		PuckVel.y = -PuckVel.y;
+		WallBounce();
 		psgPlayNote(0, 6, 1, 15, 5);
 	}
 }
@@ -252,19 +268,66 @@ void PlayTritone(void) {
 	psgPlayNote(1, 6, 0, 15, 60);
 }
 
+void UpdatePuckVelocity(void) {
+	PuckVel.x = Sin[PuckDirection];
+	PuckVel.y = Cos[PuckDirection];
+	SIGNED_MULT(PuckVel.x, PuckSpeed, PuckVel.x);
+	SIGNED_MULT(PuckVel.y, PuckSpeed, PuckVel.y);
+	PuckVel.x = PuckVel.x >> 8;
+	PuckVel.y = PuckVel.y >> 8;
+}
+
 void ResetPuck(void) {
 	Puck.loc.x = 160 << 4;
 	Puck.loc.y = 120 << 4;
-	PuckVel.x = -2 * 16;
-	PuckVel.y = 1 * 16;
+
+	PuckDirection = rngGetU8() & 0x1F;
+	PuckSpeed = 36;
+	if (PuckDirection < 16) {
+		PuckDirection = PuckDirection + 8;
+	} else {
+		PuckDirection = PuckDirection + 24;
+	}
+	UpdatePuckVelocity();
+
 	GameState = Waiting;
 	WaitTimer = 60;
 	spriteEnable(Puck.spriteIdx, false);
 }
 
 void ReflectPuck(Thing * thing) {
-	PuckVel.x = -PuckVel.x; /* simple reflection */
+	i16_t diff;
+	diff = Puck.loc.y - thing->loc.y;
+	PuckDirection = 64 - PuckDirection;
+	if (PuckDirection > 32) {
+		PuckDirection = PuckDirection + (diff >> 4);
+		if (PuckDirection > (64 - 4)) {
+			PuckDirection = (64 - 4);
+		}
+		if (PuckDirection < (32 + 4)) {
+			PuckDirection = (32 + 4);
+		}
+	} else {
+		PuckDirection = PuckDirection - (diff >> 4);
+		if (PuckDirection > (32 - 4)) {
+			PuckDirection = (32 - 4);
+		}
+		if (PuckDirection < (0 + 4)) {
+			PuckDirection = (0 + 4);
+		}
+	}
+	UpdatePuckVelocity();
+
 	psgPlayNote(0, 0, 2, 15, 5);
+}
+
+void WallBounce(void) {
+	if (PuckDirection < 32) {
+		PuckDirection = 32 - PuckDirection;
+	} else {
+		PuckDirection = 96 - PuckDirection;
+	}
+	UpdatePuckVelocity();
 }
 
 void StartAction(void) {

@@ -15,10 +15,7 @@ a tiny bit simpler. pong.c is a simple pong-like game.
 
 pong TODO:
 
-* score
-* keyboard support
 * SNES/NES support
-* paddle support
 * AI for single player mode
 * Title / 1 or 2 player / controller select screen
 

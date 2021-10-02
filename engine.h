@@ -42,6 +42,7 @@ void engineCursorSetCharacter(u8_t c);
 void enginePutChar(u8_t c);
 void enginePlaceText(u8_t * text, u16_t x, u16_t y);
 void enginePlaceU16(u16_t value, u16_t x, u16_t y);
+void enginePlaceI16(i16_t value, u16_t x, u16_t y);
 void engineClearText(u8_t fillChar);
 
 /* sprites */

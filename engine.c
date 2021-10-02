@@ -336,6 +336,28 @@ void enginePlaceU16(u16_t value, u16_t x, u16_t y) {
 	enginePlaceText(digits, x, y);
 }
 
+void enginePlaceI16(i16_t value, u16_t x, u16_t y) {
+	u16_t nextDigit, i;
+	u8_t digits[7];
+	bool negative = value < 0;
+	u16_t displayVal = negative ? (-value) : value;
+	digits[6] = 0;
+	for (i = 0; i < 6; ++i) {
+		digits[i] = ' ';
+	}
+	if (displayVal == 0) {
+		digits[5] = '0';
+	}
+	for (i = 5; i <= 5 && displayVal; --i) {
+		UNSIGNED_DIV(displayVal, 10, displayVal, nextDigit);
+		digits[i] = nextDigit + 48;
+	}
+	if (negative) {
+		digits[i] = '-';
+	}
+	enginePlaceText(digits, x, y);
+}
+
 void engineClearText(u8_t fillChar) {
 	memset((void *)textScreen, fillChar, 0x2000);
 }

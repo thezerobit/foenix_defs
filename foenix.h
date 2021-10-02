@@ -19,6 +19,9 @@
 #define u8(addr)    (*(volatile unsigned char *)addr)
 #define u16(addr)   (*(volatile unsigned short *)addr)
 #define u32(addr)   (*(volatile unsigned long *)addr)
+#define i8(addr)    (*(volatile signed char *)addr)
+#define i16(addr)   (*(volatile signed short *)addr)
+#define i32(addr)   (*(volatile signed long *)addr)
 #define u8Ptr(addr) ((volatile unsigned char *)addr)
 
 #define setBits8(addr, bits) u8(addr) = u8(addr) | (bits)
@@ -37,6 +40,11 @@
     u16(UNSIGNED_DIV_DEM_LO) = dem;\
     quo = u16(UNSIGNED_DIV_QUO_LO);\
     rem = u16(UNSIGNED_DIV_REM_LO)
+
+/* a and b are i16_t, res is i32_t */
+#define SIGNED_MULT(a, b, res)  i16(SIGNED_MULT_A_LO) = a;\
+	i16(SIGNED_MULT_B_LO) = b;\
+	res = i32(SIGNED_MULT_AL_LO)
 
 /* keyboard */
 
