@@ -64,8 +64,14 @@
 
 /* mouse */
 
-#define mouseEnable() setBits8(MOUSE_PTR_CTRL_REG_L, 1)
-#define mouseDisable() unsetBits8(MOUSE_PTR_CTRL_REG_L, 1)
+#define mouseGetByte() u8(KBD_INPT_BUF)
+#define mousePointerEnable() setBits8(MOUSE_PTR_CTRL_REG_L, 1)
+#define mousePointerDisable() unsetBits8(MOUSE_PTR_CTRL_REG_L, 1)
+
+/* this only works if vicky is being fed incoming bytes from the PS/2 port
+   during mouse interrupts, as the kernel does */
+#define mouseGetXVicky() u16(MOUSE_PTR_X_POS_L)
+#define mouseGetYVicky() u16(MOUSE_PTR_Y_POS_L)
 
 /* joystick */
 
@@ -290,6 +296,8 @@ typedef struct TilesetConfig {
 
 #define irqEnableStartOfFrame()  unsetBits8(INT_MASK_REG0, FNX0_INT00_SOF)
 #define irqDisableStartOfFrame() setBits8(INT_MASK_REG0, FNX0_INT00_SOF)
+#define irqEnableMouse()  unsetBits8(INT_MASK_REG0, FNX0_INT07_MOUSE)
+#define irqDisableMouse() setBits8(INT_MASK_REG0, FNX0_INT07_MOUSE)
 #define irqEnableKeyboard()  unsetBits8(INT_MASK_REG1, FNX1_INT00_KBD)
 #define irqDisableKeyboard() setBits8(INT_MASK_REG1, FNX1_INT00_KBD)
 #define irqEnableTimer0()  unsetBits8(INT_MASK_REG0, FNX0_INT02_TMR0)

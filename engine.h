@@ -18,10 +18,31 @@ typedef struct KeyCodes {
 	u8_t count;
 } KeyCodes;
 
+/* mouse */
+
+#define MOUSE_PS2_BUTTON_LEFT   0x01
+#define MOUSE_PS2_BUTTON_RIGHT  0x02
+#define MOUSE_PS2_BUTTON_MIDDLE 0x04
+#define MOUSE_PS2_BYTE0_ALWAYS  0x08
+#define MOUSE_PS2_X_SIGN        0x10
+#define MOUSE_PS2_Y_SIGN        0x20
+#define MOUSE_PS2_X_OVERFLOW    0x40
+#define MOUSE_PS2_Y_OVERFLOW    0x80
+
+typedef struct MouseUpdate {
+	i16_t moveX;
+	i16_t moveY;
+	u8_t buttonState;
+} MouseUpdate;
+
+typedef struct Inputs {
+	KeyCodes keyCodes;
+	MouseUpdate ps2Mouse;
+} Inputs;
 
 /* engine */
 
-typedef void (*EngineUpdateCallback)(u16_t, KeyCodes *);
+typedef void (*EngineUpdateCallback)(u16_t, Inputs *);
 
 void engineInit(void);
 void engineEnableSprites(u16_t numSpriteImages, u16_t numSprites);
@@ -41,6 +62,7 @@ void engineCursorHide(void);
 void engineCursorSetCharacter(u8_t c);
 void enginePutChar(u8_t c);
 void enginePlaceText(u8_t * text, u16_t x, u16_t y);
+void enginePlaceU8(u8_t value, u16_t x, u16_t y);
 void enginePlaceU16(u16_t value, u16_t x, u16_t y);
 void enginePlaceI16(i16_t value, u16_t x, u16_t y);
 void engineClearText(u8_t fillChar);

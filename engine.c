@@ -26,6 +26,11 @@ bool  _textCursorEnabled;
 TextCursorControl _textCursorControl;
 bool  _textClearScreen;
 
+u8_t _mousePS2Byte0;
+u8_t _mouseReadIdx;
+
+MouseUpdate _MouseUpdate;
+
 EngineUpdateCallback _UpdateCallback;
 
 u16_t _SpriteCount;
@@ -33,7 +38,8 @@ u32_t _SpriteRAM;
 Sprite _SpriteControlBuffer[SPRITE_MAX];
 
 KeyCodes _KeyCodes;
-KeyCodes _KeyCodesCopy;
+
+Inputs _inputs;
 
 u16_t _PSG_Timers[4];
 u16_t _PSG_NoteVals[12] = {
@@ -64,6 +70,8 @@ void BRKHandler(void) {
 }
 
 void IRQHandler(void) {
+	u8_t mouseInput;
+	i16_t mouseXMove, mouseYMove;
 	if (INT_PENDING_REG0) {
 		if (u8(INT_PENDING_REG0) & FNX0_INT00_SOF) {
 			u8(INT_PENDING_REG0) = FNX0_INT00_SOF;
@@ -72,6 +80,33 @@ void IRQHandler(void) {
 		if (u8(INT_PENDING_REG0) & FNX0_INT02_TMR0) {
 			u8(INT_PENDING_REG0) = FNX0_INT02_TMR0;
 			_Timer0Counter++;
+		}
+		if (u8(INT_PENDING_REG0) & FNX0_INT07_MOUSE) {
+			u8(INT_PENDING_REG0) = FNX0_INT07_MOUSE;
+			mouseInput = mouseGetByte();
+			switch (_mouseReadIdx)
+			{
+			case 0:
+				if (mouseInput & MOUSE_PS2_BYTE0_ALWAYS) {
+					_MouseUpdate.buttonState = mouseInput & 0x07;
+					_mousePS2Byte0 = mouseInput;
+					_mouseReadIdx++;
+				}
+				break;
+			case 1:
+				_MouseUpdate.moveX += mouseInput;
+				if (_mousePS2Byte0 & MOUSE_PS2_X_SIGN) {
+					_MouseUpdate.moveX -= 256;
+				}
+				_mouseReadIdx++;
+				break;
+			case 2:
+				_mouseReadIdx = 0;
+				_MouseUpdate.moveY += mouseInput;
+				if (_mousePS2Byte0 & MOUSE_PS2_Y_SIGN) {
+					_MouseUpdate.moveY -= 256;
+				}
+			}
 		}
 	}
 	if (u8(INT_PENDING_REG1) & FNX1_INT00_KBD) {
@@ -119,6 +154,11 @@ void engineInit(void) {
 	_textCursorControl.character = 0xB1; /* filled block */
 	_textCursorControl.color = 0xF0;
 	_textClearScreen = false;
+
+	_mouseReadIdx = 0;
+	_MouseUpdate.moveX = 0;
+	_MouseUpdate.moveY = 0;
+	_MouseUpdate.buttonState = 0;
 
 	_SpriteCount = 0;
 	_SpriteRAM = 0;
@@ -242,8 +282,9 @@ void engineRun(void) {
 		}
 	}
 
-	mouseDisable();
+	mousePointerDisable();
 
+	irqEnableMouse();
 	irqEnableStartOfFrame();
 	irqEnableKeyboard();
 	irqEnable();
@@ -261,14 +302,17 @@ void engineRun(void) {
 
 			updatePSG();
 
-			/* disabling IRQ to copy _KeyCodes structure which otherwise can be modified
-			   by an interrupt at any time */
+			/* disabling IRQ to copy KeyCodes and MouseInput structures which otherwise
+			   can be modified by an interrupt at any time */
 			irqDisable();
-			_KeyCodesCopy = _KeyCodes;
+			_inputs.keyCodes = _KeyCodes;
 			_KeyCodes.count = 0; /* reset key codes counter */
+			_inputs.ps2Mouse = _MouseUpdate;
+			_MouseUpdate.moveX = 0;
+			_MouseUpdate.moveY = 0;
 			irqEnable();
 
-			_UpdateCallback(_VideoFrameCounter, &_KeyCodesCopy);
+			_UpdateCallback(_VideoFrameCounter, &_inputs);
 		}
 	}
 }
@@ -320,6 +364,23 @@ void enginePlaceText(u8_t * text, u16_t x, u16_t y) {
 	while (nextChar = text[i++]) {
 		textScreen[x + i + y * _textScreenWidth] = nextChar;
 	}
+}
+
+void enginePlaceU8(u8_t value, u16_t x, u16_t y) {
+	u16_t nextDigit, i;
+	u8_t digits[4];
+	digits[3] = 0;
+	for (i = 0; i < 3; ++i) {
+		digits[i] = ' ';
+	}
+	if (value == 0) {
+		digits[2] = '0';
+	}
+	for (i = 2; i <= 2 && value; --i) {
+		UNSIGNED_DIV(value, 10, value, nextDigit);
+		digits[i] = nextDigit + 48;
+	}
+	enginePlaceText(digits, x, y);
 }
 
 void enginePlaceU16(u16_t value, u16_t x, u16_t y) {

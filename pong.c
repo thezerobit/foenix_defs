@@ -39,6 +39,8 @@ typedef enum {
 	INPUT_JOY_2,
 	INPUT_PADDLE_1,
 	INPUT_PADDLE_2,
+	INPUT_MOUSE_X,
+	INPUT_MOUSE_Y,
 	INPUT_KEY_1,
 	INPUT_LAST,
 } Input;
@@ -72,6 +74,7 @@ i16_t Cos[64] = {
 void setPosition(Thing thing);
 void doJoyMovement(u8_t joyState, Thing * paddle);
 void doPaddleMovement(u16_t paddlePos, Thing * paddle);
+void doMouseMovement(i16_t mouseMove, Thing * paddle);
 void doKeyboardMovement(Thing * paddle, KeyCodes * keyCodes);
 void UpdatePuck(void);
 void PlayTritone(void);
@@ -85,9 +88,9 @@ void ClearTitleScreen(void);
 void DrawTitleScreen(void);
 void DrawScores(void);
 void doFKeyActions(KeyCodes * keyCodes);
-void doInput(Thing * paddle, u8_t input, KeyCodes * keyCodes);
-void doInputs(KeyCodes * keyCodes);
-void Update(u16_t frame, KeyCodes * keyCodes);
+void doInput(Thing * paddle, u8_t input, Inputs * inputs);
+void doInputs(Inputs * inputs);
+void Update(u16_t frame, Inputs * inputs);
 
 
 void main(void) {
@@ -194,6 +197,16 @@ void doPaddleMovement(u16_t paddlePos, Thing * paddle) {
 	}
 	paddlePos = paddlePos - 15;
 	paddle->loc.y = paddlePos * 6 * 16;
+}
+
+void doMouseMovement(i16_t mouseMove, Thing * paddle) {
+	paddle->loc.y -= mouseMove << 4;
+	if (paddle->loc.y < PaddleMinY) {
+		paddle->loc.y = PaddleMinY;
+	}
+	if (paddle->loc.y > PaddleMaxY) {
+		paddle->loc.y = PaddleMaxY;
+	}
 }
 
 void doKeyboardMovement(Thing * paddle, KeyCodes * keyCodes) {
@@ -351,6 +364,10 @@ u8_t * GetInputName(u8_t input) {
 			return "PADDLE 1";
 		case INPUT_PADDLE_2:
 			return "PADDLE 2";
+		case INPUT_MOUSE_X:
+			return "MOUSE (X)";
+		case INPUT_MOUSE_Y:
+			return "MOUSE (Y)";
 		case INPUT_KEY_1:
 			return "KEYBOARD";
 		default:
@@ -420,7 +437,7 @@ void doFKeyActions(KeyCodes * keyCodes) {
 	}
 }
 
-void doInput(Thing * paddle, u8_t input, KeyCodes * keyCodes) {
+void doInput(Thing * paddle, u8_t input, Inputs * inputs) {
 	u16_t paddleVal;
 	switch(input) {
 		case INPUT_JOY_1:
@@ -435,30 +452,36 @@ void doInput(Thing * paddle, u8_t input, KeyCodes * keyCodes) {
 		case INPUT_PADDLE_2:
 			doPaddleMovement(pollPaddle(1), paddle);
 			break;
+		case INPUT_MOUSE_X:
+			doMouseMovement(inputs->ps2Mouse.moveX, paddle);
+			break;
+		case INPUT_MOUSE_Y:
+			doMouseMovement(inputs->ps2Mouse.moveY, paddle);
+			break;
 		case INPUT_KEY_1:
-			doKeyboardMovement(paddle, keyCodes);
+			doKeyboardMovement(paddle, &inputs->keyCodes);
 			break;
 		default:
 			break;
 	}
 }
 
-void doInputs(KeyCodes * keyCodes) {
-	doInput(&LeftPaddle, Player1Input, keyCodes);
-	doInput(&RightPaddle, Player2Input, keyCodes);
+void doInputs(Inputs * inputs) {
+	doInput(&LeftPaddle, Player1Input, inputs);
+	doInput(&RightPaddle, Player2Input, inputs);
 }
 
-void Update(u16_t frame, KeyCodes * keyCodes) {
+void Update(u16_t frame, Inputs * inputs) {
 	switch (GameState) {
 		case Start:
 			DrawTitleScreen();
 			GameState = TitleScreen;
 			break;
 		case TitleScreen:
-			doFKeyActions(keyCodes);
+			doFKeyActions(&inputs->keyCodes);
 			break;
 		case Waiting:
-			doInputs(keyCodes);
+			doInputs(inputs);
 			setPosition(LeftPaddle);
 			setPosition(RightPaddle);
 			if (!WaitTimer--) {
@@ -467,7 +490,7 @@ void Update(u16_t frame, KeyCodes * keyCodes) {
 			}
 			break;
 		case Playing:
-			doInputs(keyCodes);
+			doInputs(inputs);
 			UpdatePuck();
 			setPosition(Puck);
 			setPosition(LeftPaddle);
