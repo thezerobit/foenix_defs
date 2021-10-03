@@ -26,6 +26,7 @@ const PaddleHeight = 20;
 const PaddleMoveSpeed = 3 << 4;
 const PaddleMinY = 0;
 const PaddleMaxY = 240 << 4;
+const PuckStartingSpeed = 36;
 
 Thing Puck, LeftPaddle, RightPaddle;
 i16_t PuckDirection; /* 0 to 63 from pointing upwards, clockwise */
@@ -291,11 +292,11 @@ void UpdatePuckVelocity(void) {
 }
 
 void ResetPuck(void) {
+	PuckSpeed = PuckStartingSpeed;
 	Puck.loc.x = 160 << 4;
 	Puck.loc.y = 120 << 4;
 
 	PuckDirection = rngGetU8() & 0x1F;
-	PuckSpeed = 36;
 	if (PuckDirection < 16) {
 		PuckDirection = PuckDirection + 8;
 	} else {
@@ -311,6 +312,7 @@ void ResetPuck(void) {
 void ReflectPuck(Thing * thing) {
 	i16_t diff;
 	diff = Puck.loc.y - thing->loc.y;
+	PuckSpeed++;
 	PuckDirection = 64 - PuckDirection;
 	if (PuckDirection > 32) {
 		PuckDirection = PuckDirection + (diff >> 4);

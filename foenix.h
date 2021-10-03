@@ -48,7 +48,6 @@
 
 /* keyboard */
 
-#define keyGetCode() u8(KBD_INPT_BUF)
 #define keyIsPressed(code) !((code) & 0x80)
 #define keyIsReleased(code) ((code) & 0x80)
 #define keyScanCode(code) ((code) & 0x7F)
@@ -64,7 +63,6 @@
 
 /* mouse */
 
-#define mouseGetByte() u8(KBD_INPT_BUF)
 #define mousePointerEnable() setBits8(MOUSE_PTR_CTRL_REG_L, 1)
 #define mousePointerDisable() unsetBits8(MOUSE_PTR_CTRL_REG_L, 1)
 

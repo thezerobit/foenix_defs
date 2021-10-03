@@ -5,6 +5,19 @@ extern void POLL_PADDLE(void);
 extern u8_t WHICH_PADDLE;
 extern u8_t RETURN_PADDLE;
 
+/* machine specific */
+
+MachineInfo machineInfo;
+
+u8_t * StatusPort;
+u8_t * KbdStatus;
+u8_t * KbdOutBuf;
+u8_t * KbdInptBuf;
+u8_t * KbdCmdBuf;
+u8_t * KbdDataBuf;
+u8_t * PortA;
+u8_t * PortB;
+
 /* state */
 
 u16_t _VideoFlags;
@@ -83,7 +96,7 @@ void IRQHandler(void) {
 		}
 		if (u8(INT_PENDING_REG0) & FNX0_INT07_MOUSE) {
 			u8(INT_PENDING_REG0) = FNX0_INT07_MOUSE;
-			mouseInput = mouseGetByte();
+			mouseInput = *KbdInptBuf;
 			switch (_mouseReadIdx)
 			{
 			case 0:
@@ -112,7 +125,7 @@ void IRQHandler(void) {
 	if (u8(INT_PENDING_REG1) & FNX1_INT00_KBD) {
 		u8(INT_PENDING_REG1) = FNX1_INT00_KBD;
 		if (_KeyCodes.count < KEY_CODE_BUFFER_SIZE - 1) {
-			_KeyCodes.buffer[_KeyCodes.count++] = keyGetCode();
+			_KeyCodes.buffer[_KeyCodes.count++] = *KbdInptBuf;
 		}
 	}
 }
@@ -126,6 +139,69 @@ void engineInit(void) {
 	u8(INT_MASK_REG1) = 0xFF;
 	u8(INT_MASK_REG2) = 0xFF;
 	u8(INT_MASK_REG3) = 0xFF;
+
+	switch (u8(GABE_SYS_STAT) & 0x07) {
+		case 0x00:
+			machineInfo.name = "FMX";
+			machineInfo.superIOPresent = true;
+			machineInfo.numJoystickPorts = 4;
+			break;
+		case 0x01:
+			machineInfo.name = "U 2Meg";
+			machineInfo.superIOPresent = false;
+			machineInfo.numJoystickPorts = 2;
+			break;
+		case 0x02:
+			machineInfo.name = "TBD (Reserved)";
+			machineInfo.superIOPresent = false;
+			machineInfo.numJoystickPorts = 2;
+			break;
+		case 0x03:
+			machineInfo.name = "A2560 Dev";
+			machineInfo.superIOPresent = true;
+			machineInfo.numJoystickPorts = 4;
+			break;
+		case 0x04:
+			machineInfo.name = "FMX (Future C5A)";
+			machineInfo.superIOPresent = true;
+			machineInfo.numJoystickPorts = 4;
+			break;
+		case 0x05:
+			machineInfo.name = "U+ 4Meg U+";
+			machineInfo.superIOPresent = false;
+			machineInfo.numJoystickPorts = 2;
+			break;
+		case 0x06:
+			machineInfo.name = "TBD (Reserved)";
+			machineInfo.superIOPresent = false;
+			machineInfo.numJoystickPorts = 2;
+			break;
+		case 0x07:
+			machineInfo.name = "A2560 Keyboard";
+			machineInfo.superIOPresent = true;
+			machineInfo.numJoystickPorts = 2;
+			break;
+	}
+
+	if (machineInfo.superIOPresent) {
+		StatusPort = (u8_t *)0xAF1064;
+		KbdStatus =  (u8_t *)0xAF1064;
+		KbdOutBuf =  (u8_t *)0xAF1060;
+		KbdInptBuf = (u8_t *)0xAF1060;
+		KbdCmdBuf =  (u8_t *)0xAF1064;
+		KbdDataBuf = (u8_t *)0xAF1060;
+		PortA =      (u8_t *)0xAF1060;
+		PortB =      (u8_t *)0xAF1061;
+	} else {
+		StatusPort = (u8_t *)0xAF1807;
+		KbdStatus =  (u8_t *)0xAF1807;
+		KbdOutBuf =  (u8_t *)0xAF1803;
+		KbdInptBuf = (u8_t *)0xAF1803;
+		KbdCmdBuf =  (u8_t *)0xAF1807;
+		KbdDataBuf = (u8_t *)0xAF1803;
+		PortA =      (u8_t *)0xAF180A;
+		PortB =      (u8_t *)0xAF180B;
+	}
 
 	_VideoFlags = 0;
 	_VideoRAM = 0;
@@ -176,6 +252,10 @@ void engineInit(void) {
 		rngInit();
 		_RNGinitiated = true;
 	}
+}
+
+MachineInfo * engineGetMachineInfo(void) {
+	return &machineInfo;
 }
 
 /* each sprite image takes 1K (1024) bytes of Video RAM 

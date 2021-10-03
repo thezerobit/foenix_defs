@@ -3,6 +3,14 @@
 
 #include "foenix.h"
 
+/* Machine Info */
+
+typedef struct MachineInfo {
+	u8_t * name;
+	bool superIOPresent;
+	u8_t numJoystickPorts;
+} MachineInfo;
+
 /* definitions */
 
 #define VIDEO_RES_320x240 0
@@ -45,6 +53,7 @@ typedef struct Inputs {
 typedef void (*EngineUpdateCallback)(u16_t, Inputs *);
 
 void engineInit(void);
+MachineInfo * engineGetMachineInfo(void);
 void engineEnableSprites(u16_t numSpriteImages, u16_t numSprites);
 void engineEnableText(bool clearScreen, bool cursorEnabled);
 void engineSetResolution(u8_t videoRes);
